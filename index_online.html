@@ -81,6 +81,15 @@ button{cursor:pointer}
 .thumb.dropAfter{box-shadow:inset -3px 0 0 0 var(--blue)}
 .thumb img{-webkit-user-drag:none;user-select:none}
 .thumbGhost{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;opacity:.92;box-shadow:0 10px 26px rgba(0,0,0,.55);transform:rotate(-2deg);border-color:var(--blue)}
+.fld .lblrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.scanBtn{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:7px;padding:2px 7px;cursor:pointer;display:inline-flex;align-items:center;line-height:1}
+.scanBtn:hover{color:var(--blue);border-color:var(--blue)}
+.scanBox{margin-top:6px}
+.scanBox:empty{margin:0}
+.scanRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.scanThumb{height:54px;width:auto;max-width:110px;border-radius:6px;border:1px solid var(--line);object-fit:cover;cursor:default}
+.btn.tiny{font-size:12px;padding:4px 9px;border-radius:7px}
+.scanErr{color:#d66;margin-top:4px}
 .search{margin:0 10px 8px;position:relative;flex:none}
 .search input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--line);border-radius:10px;background:var(--field)}
 .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
@@ -915,6 +924,7 @@ function field(label, id, value, opts){
   opts = opts || {};
   const input = el(opts.area ? 'textarea' : 'input', {id, placeholder:opts.ph || '', class:opts.mono ? 'mono' : null, autocomplete:'off', spellcheck: opts.area ? 'true' : 'false'});
   input.value = value || '';
+  if(opts.scan){ const _sp=el('span', {class:'lblrow'}, [document.createTextNode(label)]); const _sb=el('button', {class:'scanBtn', type:'button', title:'Add a photo to read into this box', 'aria-label':'Add photo to convert to text', onclick:(e)=>{ e.preventDefault(); _scanPick(opts.scan); }}); _sb.innerHTML='<svg width="16" height="14" viewBox="0 0 22 18" aria-hidden="true"><rect x="1.5" y="4.5" width="19" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 4.5 L9 2 H13 L14.5 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="11" cy="10.5" r="3.3" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>'; _sp.append(_sb); return el('label', {class:'fld hasScan'}, [_sp, input, el('div', {class:'scanBox', id:'scanBox_'+opts.scan})]); }
   return el('label', {class:'fld'}, [el('span', {text:label}), input]);
 }
 function openPinEditor(pin, isNew){
@@ -938,9 +948,9 @@ function openPinEditor(pin, isNew){
       field('ATA chapter', 'f_ata', pin.ata, {mono:true, ph:'e.g. 24-11-00'}),
       field('Circuit breaker(s)', 'f_cb', pin.cb, {mono:true, ph:'e.g. P6-2 C01021, P18-1 D14'}),
       field('MEL info', 'f_mel', pin.mel, {area:true}),
-      field('BITE / test', 'f_bite', pin.bite, {area:true, ph:'BITE menu path, test steps, expected result…'}),
-      field('AMM reference', 'f_amm', pin.amm, {area:true, ph:'AMM task / procedure, e.g. 52-11-00-000-801'}),
-      field('FIM reference', 'f_fim', pin.fim, {area:true, ph:'FIM task / fault code, e.g. 32-11 TASK 801'}),
+      field('BITE / test', 'f_bite', pin.bite, {area:true, scan:'bite', ph:'BITE menu path, test steps, expected result…'}),
+      field('AMM reference', 'f_amm', pin.amm, {area:true, scan:'amm', ph:'AMM task / procedure, e.g. 52-11-00-000-801'}),
+      field('FIM reference', 'f_fim', pin.fim, {area:true, scan:'fim', ph:'FIM task / fault code, e.g. 32-11 TASK 801'}),
       el('div', {class:'fld'}, [el('span', {text:'Photos'}), photosBox, el('div', {class:'hint', text:'You can also paste a screenshot here with Ctrl+V.'})])
     ]),
     el('footer', null, [
@@ -991,6 +1001,10 @@ async function addPhotos(files){
   }
   if(editing) renderPhotos();
 }
+function _scanPick(field){ if(!editing) return; const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=()=>{ const f=inp.files&&inp.files[0]; if(f) _scanSet(field,f); }; inp.click(); }
+async function _scanSet(field,f){ if(!editing) return; try{ const im=await fileToImage(f); const big=scaled(im,1600,.85); editing.scan=editing.scan||{}; editing.scan[field]={url:big.url}; _renderScan(field); }catch(e){ toast(e.message); } }
+function _renderScan(field){ if(!editing||!editing.modal) return; const box=editing.modal.querySelector('#scanBox_'+field); if(!box) return; box.textContent=''; const s=editing.scan&&editing.scan[field]; if(!s) return; box.append(el('div',{class:'scanRow'},[ el('img',{class:'scanThumb',src:s.url,alt:'Uploaded image'}), el('button',{class:'btn tiny primary',type:'button',text:s.busy?'Converting…':'✨ Convert to text',disabled:s.busy?true:null,onclick:(e)=>{ e.preventDefault(); _scanConvert(field); }}), el('button',{class:'btn tiny',type:'button',text:'Remove',onclick:(e)=>{ e.preventDefault(); if(editing.scan) delete editing.scan[field]; _renderScan(field); }}) ])); if(s.err) box.append(el('div',{class:'hint scanErr',text:s.err})); }
+async function _scanConvert(field){ if(!editing) return; const s=editing.scan&&editing.scan[field]; if(!s||s.busy) return; s.busy=true; s.err=''; _renderScan(field); try{ const r=await fetch('https://us-central1-junpo-orders.cloudfunctions.net/imageToText',{ method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ image:s.url, hint:field }) }); const j=await r.json().catch(()=>({})); if(!r.ok||!j.text) throw new Error(j.error||('HTTP '+r.status)); const ta=editing.modal.querySelector('#f_'+field); if(ta){ const cur=(ta.value||'').replace(/\s+$/,''); ta.value=cur?(cur+'\n'+j.text):j.text; } if(editing.scan) delete editing.scan[field]; _renderScan(field); toast('Text added to '+field.toUpperCase()); }catch(e){ if(s){ s.busy=false; s.err='Could not read the image — '+((e&&e.message)||'try again'); } _renderScan(field); } }
 async function lightbox(id){
   const src = await blobGet(id); if(!src) return toast('That photo is missing from storage.');
   const lb = el('div', {class:'lightbox', onclick:() => { lb.remove(); closeTop = prev; }}, [el('img', {src, alt:'Photo, full size'})]);
