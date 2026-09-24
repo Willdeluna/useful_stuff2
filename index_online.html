@@ -193,6 +193,7 @@ button{cursor:pointer}
   .viewport{min-height:56vh}
   body.stageDown .stage{display:none}
   body.stageDown .side{max-height:none;border-bottom:0}
+  body.stageDown .thumb img{height:120px}
   #stageToggle{display:inline-flex;align-items:center;gap:6px}
   .barToggle{display:inline-flex;align-items:center;gap:5px}
   .bar.collapsed .btn:not(.barToggle){display:none}
@@ -659,6 +660,7 @@ async function deleteView(){
   state.activeViewId = state.views[0] ? state.views[0].id : null;
   commit(); renderAll();
 }
+function _openView(id){ if(document.body.classList.contains('stageDown')){ document.body.classList.remove('stageDown'); if(typeof _applyStageCollapse==='function') _applyStageCollapse(); } const done = (state.activeViewId===id) ? Promise.resolve() : setActiveView(id); Promise.resolve(done).then(()=>{ if(_isTouch){ requestAnimationFrame(()=>{ const st=document.querySelector('.stage'); if(st){ try{ st.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ if(st.scrollIntoView) st.scrollIntoView(); } } }); } }); }
 function setActiveView(id){
   if(state.activeViewId === id) return Promise.resolve();
   cancelMode();
@@ -677,7 +679,7 @@ function _grpHeader(label, count, key){
 }
 function _viewThumb(v){
   const n = state.pins.filter(p => p.viewId === v.id).length;
-  return el('button', {class:'thumb' + (v.id === state.activeViewId ? ' active' : ''), title:v.name, 'data-vid':v.id, onclick:() => setActiveView(v.id), onpointerdown:(e)=>_vPointerDown(e,v)}, [
+  return el('button', {class:'thumb' + (v.id === state.activeViewId ? ' active' : ''), title:v.name, 'data-vid':v.id, onclick:() => _openView(v.id), onpointerdown:(e)=>_vPointerDown(e,v)}, [
     el('img', {src: v.builtin==='3d' ? PLANE3D_THUMB : (v.builtin ? SIDE_URL : v.thumb), alt:'', draggable:'false'}),
     el('div', {class:'cap'}, [el('span', {class:'capName', text:v.name}), el('i', {text:String(n)}), el('button', {class:'ren', title:'Rename', 'aria-label':'Rename '+v.name, text:'✎', onclick:(e)=>{ e.stopPropagation(); e.preventDefault(); _editViewName(v, e.currentTarget); }}), el('button', {class:'ren dup', title:'Duplicate', 'aria-label':'Duplicate '+v.name, text:'⧉', onclick:(e)=>{ e.stopPropagation(); e.preventDefault(); duplicateView(v); }})])
   ]);
