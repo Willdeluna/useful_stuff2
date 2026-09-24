@@ -107,6 +107,9 @@ button{cursor:pointer}
 .viewLock.on{background:var(--blue)}
 .viewport.vlock{touch-action:pan-y}
 #stageToggle{position:fixed;left:12px;bottom:12px;z-index:20;display:none;border:none;background:#1f2633;color:#fff;border-radius:22px;padding:9px 15px;font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer}
+.barToggle{display:inline-flex;align-items:center;gap:5px}
+.bar.collapsed .btn:not(.barToggle){display:none}
+.bar.collapsed .sp{display:none}
 .search{margin:0 10px 8px;position:relative;flex:none}
 .search input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--line);border-radius:10px;background:var(--field)}
 .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
@@ -191,6 +194,9 @@ button{cursor:pointer}
   body.stageDown .stage{display:none}
   body.stageDown .side{max-height:none;border-bottom:0}
   #stageToggle{display:inline-flex;align-items:center;gap:6px}
+  .barToggle{display:inline-flex;align-items:center;gap:5px}
+  .bar.collapsed .btn:not(.barToggle){display:none}
+  .bar.collapsed .sp{display:none}
   .brand span{display:none}
   .modal footer{flex-wrap:wrap}
 }
@@ -230,19 +236,20 @@ button{cursor:pointer}
 <button id="stageToggle" type="button" aria-label="Hide image"></button>
 <div class="main">
   <aside class="side">
-    <h2>Views <button id="addView">+ Add image</button></h2>
-    <div id="viewsFilterRow"><select id="viewsFilter" class="vfSel" aria-label="Filter views by ATA chapter"></select></div>
-    <div class="views" id="views"></div>
-    <h2>Pins</h2>
     <label class="search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
       <input id="q" type="search" placeholder="Search part, MEL, C/B, AMM…" aria-label="Search all pins">
     </label>
+    <h2>Views <button id="addView">+ Add image</button></h2>
+    <div id="viewsFilterRow"><select id="viewsFilter" class="vfSel" aria-label="Filter views by ATA chapter"></select></div>
+    <div class="views" id="views"></div>
+    <h2>Pins</h2>
     <div class="list" id="list"></div>
   </aside>
 
   <section class="stage">
     <div class="bar">
+      <button class="btn barToggle" id="barToggle" type="button" aria-label="Hide tools">Tools</button>
       <input class="name" id="viewName" aria-label="View name" maxlength="40"><select class="btn" id="viewAta" title="ATA chapter for this view" aria-label="ATA chapter" disabled></select>
       <button class="btn" id="addPin"><svg width="12" height="16" viewBox="0 0 26 34" aria-hidden="true"><path d="M13 1C6.4 1 1 6.3 1 12.9 1 21.5 13 33 13 33s12-11.5 12-20.1C25 6.3 19.6 1 13 1z" fill="#b3202c"/></svg>Add pin</button>
       <button class="btn dark" id="addZone">▦ Add zone</button>
@@ -1179,6 +1186,9 @@ $('#zIn').addEventListener('click', () => zoomBtn(1.35));
 $('#viewLock').addEventListener('click', () => { _viewUnlocked = !_viewUnlocked; _applyViewLock(); });
 function _applyStageCollapse(){ const b=document.getElementById('stageToggle'); const down=document.body.classList.contains('stageDown'); if(b){ b.textContent = down ? '▴ Show image' : '▾ Hide image'; b.setAttribute('aria-label', down?'Show image':'Hide image'); } }
 $('#stageToggle').addEventListener('click', () => { document.body.classList.toggle('stageDown'); _applyStageCollapse(); });
+function _applyBarCollapse(){ const bar=document.querySelector('.bar'); const b=document.getElementById('barToggle'); if(bar&&b){ const c=bar.classList.contains('collapsed'); b.textContent=c?'▾ Tools':'▴ Tools'; b.setAttribute('aria-label', c?'Show tools':'Hide tools'); } }
+$('#barToggle').addEventListener('click', ()=>{ const bar=document.querySelector('.bar'); if(bar) bar.classList.toggle('collapsed'); _applyBarCollapse(); });
+_applyBarCollapse();
 _applyStageCollapse();
 _applyViewLock();
 $('#zOut').addEventListener('click', () => zoomBtn(1 / 1.35));
