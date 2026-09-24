@@ -98,6 +98,15 @@ button{cursor:pointer}
 .lblbtns{display:flex;gap:6px;align-items:center}
 .scanBtn.on{color:var(--blue);border-color:var(--blue)}
 .fld textarea.tall{min-height:55vh}
+.reorderBar{display:flex;align-items:center;gap:10px;margin:2px 0 9px;flex-wrap:wrap}
+.reorderToggle{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:20px;padding:5px 13px;font-size:12px;font-weight:600;cursor:pointer}
+.reorderToggle.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.reorderHint{font-size:11px;color:var(--muted)}
+.vgGrid.reorder .thumb{touch-action:none;cursor:grab;outline:1.5px dashed rgba(80,120,255,.55);outline-offset:-2px}
+.viewLock{position:absolute;right:12px;bottom:12px;z-index:6;width:44px;height:44px;border-radius:50%;border:none;background:#1f2633;color:#fff;font-size:20px;box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.viewLock.on{background:var(--blue)}
+.viewport.vlock{touch-action:pan-y}
+#stageToggle{position:fixed;left:12px;bottom:12px;z-index:20;display:none;border:none;background:#1f2633;color:#fff;border-radius:22px;padding:9px 15px;font-size:13px;font-weight:700;box-shadow:0 6px 18px rgba(0,0,0,.35);cursor:pointer}
 .search{margin:0 10px 8px;position:relative;flex:none}
 .search input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid var(--line);border-radius:10px;background:var(--field)}
 .search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--muted)}
@@ -179,6 +188,9 @@ button{cursor:pointer}
   .main{grid-template-columns:1fr;grid-template-rows:auto auto}
   .side{border-right:0;border-bottom:1px solid var(--line);max-height:46vh}
   .viewport{min-height:56vh}
+  body.stageDown .stage{display:none}
+  body.stageDown .side{max-height:none;border-bottom:0}
+  #stageToggle{display:inline-flex;align-items:center;gap:6px}
   .brand span{display:none}
   .modal footer{flex-wrap:wrap}
 }
@@ -215,6 +227,7 @@ button{cursor:pointer}
 </div>
 <div class="warnbar" id="warnbar" hidden></div>
 
+<button id="stageToggle" type="button" aria-label="Hide image"></button>
 <div class="main">
   <aside class="side">
     <h2>Views <button id="addView">+ Add image</button></h2>
@@ -249,6 +262,7 @@ button{cursor:pointer}
       </div>
       <canvas id="gl3d"></canvas>
       <div id="pins3d"></div>
+      <button class="viewLock" id="viewLock" type="button" hidden>🔒</button>
       <div class="modebar" id="modebar" hidden><span id="modeText"></span><button id="modeCancel">Cancel</button></div>
       <div class="empty" id="emptyStage" hidden>
         <b>No views yet</b>
@@ -661,10 +675,11 @@ function _viewThumb(v){
     el('div', {class:'cap'}, [el('span', {class:'capName', text:v.name}), el('i', {text:String(n)}), el('button', {class:'ren', title:'Rename', 'aria-label':'Rename '+v.name, text:'✎', onclick:(e)=>{ e.stopPropagation(); e.preventDefault(); _editViewName(v, e.currentTarget); }}), el('button', {class:'ren dup', title:'Duplicate', 'aria-label':'Duplicate '+v.name, text:'⧉', onclick:(e)=>{ e.stopPropagation(); e.preventDefault(); duplicateView(v); }})])
   ]);
 }
-let _dragState=null;
-function _vPointerDown(e,v){ if(e.button!=null && e.button!==0) return; if(e.target && e.target.closest && (e.target.closest('.ren') || e.target.tagName==='INPUT')) return; const tile=e.currentTarget; const r=tile.getBoundingClientRect(); _dragState={ vid:v.id, tile:tile, sx:e.clientX, sy:e.clientY, ox:e.clientX-r.left, oy:e.clientY-r.top, w:r.width, h:r.height, dragging:false, overVid:null, after:false, ghost:null }; window.addEventListener('pointermove', _vPointerMove, true); window.addEventListener('pointerup', _vPointerUp, true); }
+let _dragState=null, _reorderUnlocked=false;
+function _vPointerDown(e,v){ if(e.button!=null && e.button!==0) return; if(!_reorderUnlocked) return; if(e.target && e.target.closest && (e.target.closest('.ren') || e.target.tagName==='INPUT')) return; const tile=e.currentTarget; const r=tile.getBoundingClientRect(); _dragState={ vid:v.id, tile:tile, sx:e.clientX, sy:e.clientY, ox:e.clientX-r.left, oy:e.clientY-r.top, w:r.width, h:r.height, dragging:false, overVid:null, after:false, ghost:null }; window.addEventListener('pointermove', _vPointerMove, true); window.addEventListener('pointerup', _vPointerUp, true); }
 function _vPointerMove(e){ const st=_dragState; if(!st) return; const dx=e.clientX-st.sx, dy=e.clientY-st.sy; if(!st.dragging){ if((dx*dx+dy*dy) < 36) return; st.dragging=true; st.tile.classList.add('dragging'); document.body.style.userSelect='none'; const g=st.tile.cloneNode(true); g.classList.add('thumbGhost'); g.classList.remove('dragging'); g.style.width=st.w+'px'; g.style.height=st.h+'px'; document.body.appendChild(g); st.ghost=g; } e.preventDefault(); if(st.ghost){ st.ghost.style.left=(e.clientX-st.ox)+'px'; st.ghost.style.top=(e.clientY-st.oy)+'px'; } const el2=document.elementFromPoint(e.clientX, e.clientY); const over=(el2 && el2.closest)?el2.closest('.thumb[data-vid]'):null; document.querySelectorAll('.thumb.dropBefore,.thumb.dropAfter').forEach(n=>n.classList.remove('dropBefore','dropAfter')); if(over && over!==st.tile){ const r=over.getBoundingClientRect(); const after=(e.clientX-r.left)>r.width/2; over.classList.add(after?'dropAfter':'dropBefore'); st.overVid=over.getAttribute('data-vid'); st.after=after; } else { st.overVid=null; } }
 function _vPointerUp(e){ const st=_dragState; _dragState=null; window.removeEventListener('pointermove', _vPointerMove, true); window.removeEventListener('pointerup', _vPointerUp, true); document.body.style.userSelect=''; if(st && st.ghost){ try{ st.ghost.remove(); }catch(_){} } document.querySelectorAll('.thumb.dragging,.thumb.dropBefore,.thumb.dropAfter').forEach(n=>n.classList.remove('dragging','dropBefore','dropAfter')); if(!st) return; if(st.dragging){ const kill=(ev)=>{ ev.stopPropagation(); ev.preventDefault(); window.removeEventListener('click',kill,true); }; window.addEventListener('click',kill,true); setTimeout(()=>{ try{ window.removeEventListener('click',kill,true); }catch(_){} },400); if(st.overVid && st.overVid!==st.vid) _reorderViews(st.vid, st.overVid, st.after); } }
+function _reorderBar(){ const on=_reorderUnlocked; const btn=el('button',{class:'reorderToggle'+(on?' on':''), type:'button', onclick:(e)=>{ e.preventDefault(); e.stopPropagation(); _reorderUnlocked=!_reorderUnlocked; renderViews(); }, text: on?'✓ Done — lock order':'↕ Reorder tiles'}); const bar=el('div',{class:'reorderBar'},[btn]); if(on) bar.append(el('span',{class:'reorderHint',text:'Drag tiles to move — tap Done when finished'})); return bar; }
 function _reorderViews(dragId, targetId, after){ const arr=state.views; const from=arr.findIndex(v=>v.id===dragId); if(from<0) return; const moved=arr.splice(from,1)[0]; let ti=arr.findIndex(v=>v.id===targetId); if(ti<0){ arr.push(moved); } else { arr.splice(after?ti+1:ti, 0, moved); } commit(); renderViews(); }
 async function duplicateView(v){ if(!v) return; const nv=Object.assign({}, v); nv.id=uid('v'); nv.name=((v.name||'View').slice(0,32))+' (copy)'; nv.updated=Date.now(); if(v.imgId){ try{ const data=await blobGet(v.imgId); if(data!=null){ const nid=uid('img'); await blobSet(nid, data); nv.imgId=nid; } }catch(_){} } const i=state.views.findIndex(x=>x.id===v.id); if(i<0) state.views.push(nv); else state.views.splice(i+1,0,nv); commit(); renderViews(); toast('Duplicated "'+(v.name||'view')+'"'); }
 function _editViewName(v, btn){ const cap = btn && btn.parentNode; if(!cap) return; const _tile=cap.closest?cap.closest('.thumb'):null; if(_tile) _tile.draggable=false; const span = cap.querySelector('.capName'); if(!span) return; const inp = el('input', {class:'capEditInp', value:v.name||'', maxlength:'40'}); let done=false; const finish=(save)=>{ if(done) return; done=true; const nv=(inp.value||'').trim(); if(save && nv && nv!==v.name){ v.name=nv.slice(0,40); v.updated=Date.now(); commit(); if(v.id===state.activeViewId){ const q=$('#viewName'); if(q) q.value=v.name; } } renderViews(); renderList(); }; inp.addEventListener('click', e=> e.stopPropagation()); inp.addEventListener('keydown', e=>{ e.stopPropagation(); if(e.key==='Enter'){ e.preventDefault(); finish(true); } else if(e.key==='Escape'){ e.preventDefault(); finish(false); } }); inp.addEventListener('blur', ()=> finish(true)); span.replaceWith(inp); inp.focus(); inp.select(); }
@@ -682,7 +697,7 @@ function renderViews(){
   state.collapsedAta = state.collapsedAta || {};
   // General = the location images (uploaded views + built-in aircraft)
   box.append(_grpHeader('General', state.views.length, '__gen'));
-  if(!state.collapsedAta['__gen']){ const g = el('div', {class:'vgGrid'}); state.views.forEach(v => g.append(_viewThumb(v))); box.append(g); }
+  if(!state.collapsedAta['__gen']){ if(state.views.length>1) box.append(_reorderBar()); const g = el('div', {class:'vgGrid'+(_reorderUnlocked?' reorder':'')}); state.views.forEach(v => g.append(_viewThumb(v))); box.append(g); }
   { const _av=activeView(); if(_av){ const _ov=state.pins.filter(p=>p.viewId===_av.id&&p.photos&&p.photos.length); if(_ov.length){ let _cn=0; _ov.forEach(p=>_cn+=p.photos.length); box.append(_grpHeader('📷 '+(_av.name||'This view'), _cn, '__onview')); if(!state.collapsedAta['__onview']){ const g=el('div',{class:'vgGrid'}); _ov.forEach(p=>p.photos.forEach(ph=>g.append(_photoThumb(p,ph)))); box.append(g); } } } }
   // ATA groups = the photos uploaded in each pin, grouped by the pin's ATA number
   const pinGroups = new Map();
@@ -742,7 +757,7 @@ let stageToken = 0;
 async function renderStage(){
   const v = activeView(), token = ++stageToken;
   $('#emptyStage').hidden = !!v; canvas.hidden = !v || !!(v&&v.builtin==='3d');
-  const _is3d=!!(v&&v.builtin==='3d'); vp.classList.toggle('is3d',_is3d); if(_is3d){plane3dOn();}else{plane3dOff();} ['#viewName','#addPin','#lblToggle'].forEach(s => { $(s).disabled = !v; }); ['#addZone','#replaceImg','#delView','#zIn','#zOut','#zFit'].forEach(s => { $(s).disabled = !v || _is3d; });
+  const _is3d=!!(v&&v.builtin==='3d'); vp.classList.toggle('is3d',_is3d); if(_is3d){plane3dOn();}else{plane3dOff();} if(typeof _applyViewLock==='function') _applyViewLock(); ['#viewName','#addPin','#lblToggle'].forEach(s => { $(s).disabled = !v; }); ['#addZone','#replaceImg','#delView','#zIn','#zOut','#zFit'].forEach(s => { $(s).disabled = !v || _is3d; });
   $('#viewName').value = v ? v.name : ''; populateViewAta(v?(v.ata||''):''); $('#viewAta').disabled = !v;
   if(!v) return;
   if(v.builtin==='3d'){ renderMarks(); return; } canvas.style.width = v.w + 'px'; canvas.style.height = v.h + 'px';
@@ -784,12 +799,15 @@ function setMode(m){
 }
 function cancelMode(){ if(draftEl){ draftEl.remove(); draftEl = null; } if(mode) setMode(null); }
 
+const _isTouch = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || ('ontouchstart' in window);
+let _viewUnlocked = !_isTouch;
+function _applyViewLock(){ const is3d=vp.classList.contains('is3d'); vp.classList.toggle('vlock', _isTouch && !_viewUnlocked && !is3d); const b=document.getElementById('viewLock'); if(b){ b.hidden = !_isTouch || is3d || !activeView(); b.classList.toggle('on', _viewUnlocked); b.textContent = _viewUnlocked ? '🔓' : '🔒'; b.title = _viewUnlocked ? 'Tap to lock the image (prevents accidental panning)' : 'Tap to unlock — then drag to pan'; b.setAttribute('aria-label', b.title); } }
 let ptr = null;
 vp.addEventListener('pointerdown', e => {
   if(e.button !== 0 || !activeView() || e.target.closest('.modebar,.empty') || vp.classList.contains('is3d')) return;
   ptr = {id:e.pointerId, x0:e.clientX, y0:e.clientY, tx0:cam.tx, ty0:cam.ty, target:e.target, moved:false, zone:null};
   if(mode && mode.type === 'zone') ptr.zone = toPct(e.clientX, e.clientY);
-  try { vp.setPointerCapture(e.pointerId); } catch(_){}
+  if(!(_isTouch && !_viewUnlocked)){ try { vp.setPointerCapture(e.pointerId); } catch(_){} }
 });
 vp.addEventListener('pointermove', e => {
   if(!ptr || e.pointerId !== ptr.id) return;
@@ -803,7 +821,7 @@ vp.addEventListener('pointermove', e => {
     if(!draftEl){ draftEl = el('div', {class:'draft-zone'}); canvas.append(draftEl); }
     draftEl.style.cssText = 'left:'+x*100+'%;top:'+y*100+'%;width:'+(x2-x)*100+'%;height:'+(y2-y)*100+'%';
     ptr.rect = {x, y, w:x2-x, h:y2-y};
-  } else { cam.tx = ptr.tx0 + dx; cam.ty = ptr.ty0 + dy; applyCam(); vp.classList.add('panning'); }
+  } else { if(_isTouch && !_viewUnlocked) return; cam.tx = ptr.tx0 + dx; cam.ty = ptr.ty0 + dy; applyCam(); vp.classList.add('panning'); }
 });
 function endPtr(e, cancelled){
   if(!ptr || e.pointerId !== ptr.id) return;
@@ -1158,6 +1176,11 @@ $('#addZone').addEventListener('click', () => { if(mode && mode.type === 'zone')
 $('#modeCancel').addEventListener('click', cancelMode);
 $('#lblToggle').addEventListener('click', () => { state.labels = !state.labels; commit(); renderMarks(); });
 $('#zIn').addEventListener('click', () => zoomBtn(1.35));
+$('#viewLock').addEventListener('click', () => { _viewUnlocked = !_viewUnlocked; _applyViewLock(); });
+function _applyStageCollapse(){ const b=document.getElementById('stageToggle'); const down=document.body.classList.contains('stageDown'); if(b){ b.textContent = down ? '▴ Show image' : '▾ Hide image'; b.setAttribute('aria-label', down?'Show image':'Hide image'); } }
+$('#stageToggle').addEventListener('click', () => { document.body.classList.toggle('stageDown'); _applyStageCollapse(); });
+_applyStageCollapse();
+_applyViewLock();
 $('#zOut').addEventListener('click', () => zoomBtn(1 / 1.35));
 $('#zFit').addEventListener('click', fit);
 $('#q').addEventListener('input', renderList);
