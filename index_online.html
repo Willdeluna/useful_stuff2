@@ -188,15 +188,15 @@ button{cursor:pointer}
 
 @media (max-width:820px){
   body{overflow:auto}
-  .main{grid-template-columns:1fr;grid-template-rows:auto auto}
+  .main{display:block}
   .side{border-right:0;border-bottom:0;max-height:none}
-  .views{max-height:48vh;min-height:300px;border-bottom:5px solid var(--blue)}
+  .views{max-height:72vh;overflow:auto;margin:8px 10px 12px;padding:8px;border:2px solid var(--line);border-bottom:12px solid var(--blue);border-radius:12px;background:#fff}
   body:not(.searching) #pinsHead,body:not(.searching) #list{display:none}
   body.searching #viewsHead,body.searching #viewsFilterRow,body.searching #views{display:none}
   .viewport{min-height:56vh}
   body.stageDown .stage{display:none}
   body.stageDown .side{max-height:none;border-bottom:0}
-  body.stageDown .thumb img{height:120px}
+  body.stageDown .thumb img{height:70px}
   #stageToggle{display:inline-flex;align-items:center;gap:6px}
   .barToggle{display:inline-flex;align-items:center;gap:5px}
   .bar.collapsed .btn:not(.barToggle){display:none}
@@ -892,7 +892,7 @@ function pulse(id){
 }
 async function focusPin(p){
   if(p.viewId == null || p.x == null) return openPinEditor(p);
-  await setActiveView(p.viewId);
+  if(document.body.classList.contains('stageDown')){ document.body.classList.remove('stageDown'); if(typeof _applyStageCollapse==='function') _applyStageCollapse(); } await setActiveView(p.viewId); if(_isTouch){ requestAnimationFrame(()=>{ const st=document.querySelector('.stage'); if(st){ try{ st.scrollIntoView({behavior:'smooth', block:'start'}); }catch(_){ if(st.scrollIntoView) st.scrollIntoView(); } } }); }
   const v = activeView(), r = vp.getBoundingClientRect();
   if(cam.z > cam.fit * 1.05){ cam.tx = r.width/2 - p.x * v.w * cam.z; cam.ty = r.height/2 - p.y * v.h * cam.z; applyCam(); }
   pulse(p.id);
@@ -1194,6 +1194,7 @@ function _applyStageCollapse(){ const b=document.getElementById('stageToggle'); 
 $('#stageToggle').addEventListener('click', () => { document.body.classList.toggle('stageDown'); _applyStageCollapse(); });
 function _applyBarCollapse(){ const bar=document.querySelector('.bar'); const b=document.getElementById('barToggle'); if(bar&&b){ const c=bar.classList.contains('collapsed'); b.textContent=c?'▾ Tools':'▴ Tools'; b.setAttribute('aria-label', c?'Show tools':'Hide tools'); } }
 $('#barToggle').addEventListener('click', ()=>{ const bar=document.querySelector('.bar'); if(bar) bar.classList.toggle('collapsed'); _applyBarCollapse(); });
+if(_isTouch){ document.body.classList.add('stageDown'); }
 _applyBarCollapse();
 _applyStageCollapse();
 _applyViewLock();
